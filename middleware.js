@@ -37,14 +37,15 @@ function parseCookies(header) {
 
 function loginPageHtml(errorMessage) {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GreenGo Dashboard — Sign in</title>
+<title>لوحة أداء متجرك — تسجيل الدخول</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:'Cairo',-apple-system,"Segoe UI",Roboto,sans-serif;
     background:#0a0c10; color:#e7ebf0;
     display:flex; align-items:center; justify-content:center;
     min-height:100vh; margin:0;
@@ -72,10 +73,10 @@ function loginPageHtml(errorMessage) {
 </head>
 <body>
   <form method="POST">
-    <h1>🍓 GreenGo Dashboard</h1>
+    <h1>🤖 لوحة أداء متجرك · ASKAI</h1>
     ${errorMessage ? `<div class="err">${errorMessage}</div>` : ""}
-    <input type="password" name="password" placeholder="Password" autofocus required />
-    <button type="submit">Enter</button>
+    <input type="password" name="password" placeholder="كلمة السر" autofocus required />
+    <button type="submit">دخول</button>
   </form>
 </body>
 </html>`;
@@ -98,8 +99,20 @@ export default async function middleware(request) {
   }
 
   // Already authenticated (valid session cookie) -> let the request through.
+  // This includes /api/* calls, which is what lets the dashboard reach the
+  // proxy routes while keeping them closed to everyone else.
   if (cookies[COOKIE_NAME] && cookies[COOKIE_NAME] === expectedToken) {
     return;
+  }
+
+  // /api/* is called by fetch(), not by a person. Answering with the login HTML
+  // would make JSON.parse blow up in the browser with a confusing error, and a
+  // JSON POST body would break request.formData() below. Answer in JSON instead.
+  if (url.pathname.startsWith("/api/")) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   // Handle a submitted login form.
@@ -119,7 +132,7 @@ export default async function middleware(request) {
       return res;
     }
 
-    return new Response(loginPageHtml("Wrong password, try again."), {
+    return new Response(loginPageHtml("كلمة السر غلط، جرب تاني."), {
       status: 401,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
