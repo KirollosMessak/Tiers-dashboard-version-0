@@ -105,6 +105,32 @@
   .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--gold);
     border-radius:50%;display:inline-block;animation:spin .7s linear infinite;vertical-align:middle}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* ---------- كروت قابلة للضغط + نافذة التفاصيل ---------- */
+  .kpi.click{cursor:pointer;position:relative}
+  .kpi.click .more{font-size:.7rem;color:var(--cyan);font-weight:700;margin-top:6px}
+  .kpi.click:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .modal-bg{position:fixed;inset:0;z-index:100;background:rgba(2,6,16,.72);backdrop-filter:blur(6px);
+    display:none;align-items:flex-start;justify-content:center;padding:6vh 16px}
+  .modal-bg.open{display:flex}
+  .modal{width:100%;max-width:720px;max-height:86vh;display:flex;flex-direction:column;
+    background:linear-gradient(165deg,#0F1C38,#091226);border:1px solid var(--line-str);border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+  .modal-head h3{font-size:1rem;font-weight:800}
+  .modal-head .x{background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1}
+  .modal-body{overflow-y:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px}
+  .card-row{background:var(--bg-elev);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card-row .top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .card-row .name{font-weight:800;font-size:.92rem}
+  .card-row .ph{font-size:.78rem;color:var(--muted);direction:ltr;display:inline-block}
+  .card-row .body{font-size:.84rem;margin-top:8px;line-height:1.7;color:#C9D5EA;white-space:normal}
+  .card-row .body .k{color:var(--muted)}
+  .card-row .tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .wa{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;font-size:.78rem;font-weight:800;
+    background:rgba(37,211,102,.14);color:#4ADE80;border:1px solid rgba(37,211,102,.3);text-decoration:none}
+  .wa:hover{background:rgba(37,211,102,.22)}
+  .pill.ok{background:rgba(52,211,153,.14);color:var(--emerald)}
+
   #report{display:none}
   body.ready #report{display:block}
   body.ready #state{display:none}
@@ -198,6 +224,13 @@
       <div class="kpi-grid" id="kpiService"></div>
       <div class="panel"><div class="panel-head"><h3>رسايل العملاء على مدار اليوم</h3><span class="hint">بتوقيت القاهرة · الفاتح = بعد المواعيد</span></div><canvas id="chHours"></canvas></div>
     </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">—</h3><button class="x" id="modalX" aria-label="إغلاق">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
 
@@ -299,17 +332,62 @@ function render(r){
   document.getElementById('attention').innerHTML = att.length ? att.join('') : '<div class="empty">كله تمام 👌</div>';
 
   // ---- خدمة العملاء ----
+  LISTS.needs = V.needs_human_list||[]; LISTS.complaints = V.complaints_list||[];
   document.getElementById('kpiService').innerHTML=[
     kpi('رسايل العملاء',fmt(V.messages),'',delta(V.messages_change_pct)),
     kpi('بعد المواعيد',fmt(V.after_hours_pct)+'%','gold',note(fmt(V.after_hours)+' رسالة من 10 بالليل لـ 8 الصبح')),
-    kpi('محتاجين تدخلك',fmt(C.needs_human),C.needs_human?'ru':'em'),
-    kpi('شكاوى مفتوحة',fmt(V.complaints_open),V.complaints_open?'ru':'em',note(fmt(V.complaints_high_open)+' خطيرة')),
+    clickKpi('needs','محتاجين تدخلك',fmt(C.needs_human),C.needs_human?'ru':'em',''),
+    clickKpi('complaints','شكاوى مفتوحة',fmt(V.complaints_open),V.complaints_open?'ru':'em',note(fmt(V.complaints_high_open)+' خطيرة')),
   ].join('');
   chart('chHours',{type:'bar',data:{labels:V.messages_by_hour.map(x=>x.hour+':00'),
     datasets:[{data:V.messages_by_hour.map(x=>x.value),
       backgroundColor:V.messages_by_hour.map(x=>(x.hour>=22||x.hour<8)?CY:'rgba(62,123,250,.55)'),borderRadius:4}]},
     options:{...noLegend,scales:gridY}});
 }
+
+// ---------- تفاصيل "محتاجين تدخلك" و "الشكاوى" ----------
+const LISTS={needs:[],complaints:[]};
+const clickKpi=(key,label,value,cls,extra)=>
+  `<div class="kpi click" data-list="${key}" tabindex="0" role="button">`+
+  `<div class="label">${label}</div><div class="value ${cls}">${value}</div>${extra}<div class="more">اضغط للتفاصيل ←</div></div>`;
+// رابط واتساب مباشر — الرقم محفوظ بصيغة دولية (20...) فينفع يتحط زي ما هو
+const waLink=p=>`<a class="wa" href="https://wa.me/${encodeURIComponent(p)}" target="_blank" rel="noopener">💬 واتساب</a>`;
+const waitPill=d=>d===null||d===undefined?'':
+  `<span class="pill ${d>=3?'bad':d>=1?'warn':'ok'}">${d===0?'النهارده':'بقاله '+fmt(d)+' يوم'}</span>`;
+const SEV={high:['خطيرة','bad'],medium:['متوسطة','warn'],low:['بسيطة','ok']};
+
+function openList(key){
+  const rows=LISTS[key]||[];
+  let title, html;
+  if(key==='needs'){
+    title=`عملاء محتاجين تدخلك (${fmt(rows.length)})`;
+    html=rows.map(c=>`<div class="card-row">
+      <div class="top"><div><div class="name">${esc(c.name)}</div><span class="ph">${esc(c.phone)}</span></div>
+        <div class="tags">${waitPill(c.waiting_days)}${waLink(c.phone)}</div></div>
+      <div class="body">
+        ${c.last_product?`<div><span class="k">سأل عن:</span> ${esc(c.last_product)}</div>`:''}
+        ${c.last_message?`<div><span class="k">آخر رسالة:</span> "${esc(c.last_message)}"</div>`:'<div class="k">مفيش رسايل مسجّلة</div>'}
+      </div></div>`).join('');
+  } else {
+    title=`الشكاوى المفتوحة (${fmt(rows.length)})`;
+    html=rows.map(c=>{const s=SEV[c.severity]||[c.severity||'—','warn'];
+      return `<div class="card-row">
+      <div class="top"><div><div class="name">${esc(c.name)}</div><span class="ph">${esc(c.phone)}</span></div>
+        <div class="tags"><span class="pill ${s[1]}">${esc(s[0])}</span>${waitPill(c.open_days)}${waLink(c.phone)}</div></div>
+      <div class="body"><div><span class="k">الشكوى:</span> ${esc(c.issue||'—')}</div>
+        ${c.date?`<div class="k">اتسجلت ${esc(c.date)}${c.id?' · رقم '+esc(c.id):''}</div>`:''}</div></div>`;}).join('');
+  }
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').innerHTML=html||'<div class="empty">مفيش حاجة هنا 👌</div>';
+  document.getElementById('modalBg').classList.add('open');
+  document.getElementById('modalX').focus();
+}
+function closeModal(){ document.getElementById('modalBg').classList.remove('open'); }
+document.getElementById('kpiService').addEventListener('click',e=>{ const k=e.target.closest('[data-list]'); if(k) openList(k.dataset.list); });
+document.getElementById('kpiService').addEventListener('keydown',e=>{ const k=e.target.closest('[data-list]'); if(k&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); openList(k.dataset.list); } });
+document.getElementById('modalX').addEventListener('click',closeModal);
+document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
 let DAYS=30;
 async function load(){
