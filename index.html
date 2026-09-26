@@ -179,6 +179,35 @@
   .locked>.inner{filter:grayscale(1);opacity:.25;pointer-events:none}
   .lock-ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px}
   .lock-ov .t{font-weight:800}
+
+  /* ---------- BUSINESS REPORT (WF16) ---------- */
+  .rep-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .rep-bar .period{font-size:.8rem;color:var(--muted)}
+  .seg{display:inline-flex;background:var(--bg-elev);border:1px solid var(--line-str);border-radius:11px;padding:3px}
+  .seg button{background:none;border:none;color:var(--muted);font-weight:700;font-size:.82rem;
+    padding:7px 16px;border-radius:9px;cursor:pointer;transition:.18s}
+  .seg button.on{background:var(--gold-soft);color:var(--gold)}
+  .rep-section{margin-bottom:28px}
+  .rep-section>h2{font-size:.95rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .rep-section>h2::before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(var(--cyan),var(--azure))}
+  .delta{font-size:.72rem;font-weight:800;margin-top:4px}
+  .delta.up{color:var(--emerald)} .delta.down{color:var(--ruby)} .delta.flat{color:var(--muted)}
+  .rep-note{font-size:.74rem;color:var(--muted);margin-top:-12px;margin-bottom:18px}
+  .rep-err{padding:14px 18px;border-radius:12px;background:rgba(242,109,109,.1);border:1px solid rgba(242,109,109,.3);
+    color:var(--ruby);font-weight:700;font-size:.85rem;margin-bottom:18px}
+  #page-report .panel{min-width:0}
+  /* مانعرضش الأقسام فاضية — تظهر بس بعد ما التقرير يوصل */
+  #page-report:not(.has-data) .rep-section{display:none}
+  .rep-loading{padding:60px 20px;text-align:center;color:var(--muted);font-size:.9rem}
+  #page-report.has-data .rep-loading{display:none}
+  #rTopTable{min-width:0}
+  .list-mini{display:flex;flex-direction:column;gap:8px}
+  .list-mini .row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;
+    background:var(--bg-elev);border:1px solid var(--line);border-radius:10px;font-size:.84rem}
+  @media(max-width:640px){.page{padding:18px 16px 50px}.topbar{padding:12px 16px}.tabs{padding:10px 16px 0}
+    #page-report .kpi-grid{grid-template-columns:1fr 1fr;gap:10px}
+    #page-report .kpi{padding:14px}
+    #page-report .kpi .value{font-size:1.3rem}}
 </style>
 </head>
 <body>
@@ -199,6 +228,7 @@
 
 <div class="tabs">
   <div class="tab active" data-page="overview">نظرة عامة</div>
+  <div class="tab" data-page="report">تقرير الأعمال</div>
   <div class="tab" data-page="analytics">التحليلات</div>
   <div class="tab" data-page="data">البيانات</div>
   <div class="tab" data-page="content">إنشاء محتوى</div>
@@ -221,6 +251,78 @@
     <div class="panel"><div class="panel-head"><h3>حالة الأوردرات</h3></div><canvas id="chStatus"></canvas></div>
     <div class="panel"><div class="panel-head"><h3>طرق الدفع</h3></div><canvas id="chPay"></canvas></div>
     <div class="panel"><div class="panel-head"><h3>حالة العملاء</h3></div><canvas id="chCust"></canvas></div>
+  </div>
+</div>
+
+<!-- ============ BUSINESS REPORT (WF16) ============ -->
+<div class="page" id="page-report">
+  <div class="rep-bar">
+    <div>
+      <div style="font-size:1.05rem;font-weight:800">تقرير الأعمال</div>
+      <div class="period" id="repPeriod">—</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="seg" id="repSeg">
+        <button data-d="7">7 أيام</button>
+        <button data-d="30" class="on">30 يوم</button>
+        <button data-d="90">90 يوم</button>
+      </div>
+      <button class="btn" id="repRefresh">⟳</button>
+    </div>
+  </div>
+  <div id="repErr"></div>
+  <div class="rep-note" id="repNote"></div>
+  <div class="rep-loading" id="repLoading"><span class="spinner"></span> جاري تجهيز التقرير...</div>
+
+  <div class="rep-section" data-svc="orders">
+    <h2>المبيعات والأوردرات</h2>
+    <div class="kpi-grid" id="repSales"></div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>المبيعات</h3><span class="hint">جنيه · من غير الملغي والمرتجع</span></div><canvas id="rChRevenue"></canvas></div>
+      <div class="panel"><div class="panel-head"><h3>عدد الأوردرات</h3></div><canvas id="rChOrders"></canvas></div>
+    </div>
+    <div class="grid-3">
+      <div class="panel"><div class="panel-head"><h3>حالة الأوردرات</h3></div><canvas id="rChStatus"></canvas></div>
+      <div class="panel"><div class="panel-head"><h3>طرق الدفع</h3></div><canvas id="rChPay"></canvas></div>
+      <div class="panel">
+        <div class="panel-head"><h3>أوردرات واقفة</h3><span class="hint">أكتر من 5 أيام من غير شحن</span></div>
+        <div class="list-mini" id="rStalled"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rep-section" data-svc="orders">
+    <h2>المنتجات</h2>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>الأعلى مبيعاً</h3><span class="hint">حسب الإيراد</span></div><canvas id="rChTop"></canvas></div>
+      <div class="panel">
+        <div class="panel-head"><h3>تفاصيل المنتجات</h3></div>
+        <div class="table-wrap"><table id="rTopTable"><thead></thead><tbody></tbody></table></div>
+        <div class="panel-head" style="margin-top:18px"><h3>مخزون قليل</h3><span class="hint">5 قطع أو أقل</span></div>
+        <div class="list-mini" id="rLowStock"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rep-section" data-svc="care">
+    <h2>العملاء</h2>
+    <div class="kpi-grid" id="repCust"></div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>عملاء جدد</h3></div><canvas id="rChNew"></canvas></div>
+      <div class="panel"><div class="panel-head"><h3>حالة العملاء</h3></div><canvas id="rChCust"></canvas></div>
+    </div>
+  </div>
+
+  <div class="rep-section" data-svc="care">
+    <h2>البوت وخدمة العملاء</h2>
+    <div class="kpi-grid" id="repSvc"></div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>رسايل العملاء على مدار اليوم</h3><span class="hint">بتوقيت القاهرة · الفاتح = بعد المواعيد</span></div><canvas id="rChHours"></canvas></div>
+      <div class="panel">
+        <div class="panel-head"><h3>أسباب فشل الإرسال</h3><span class="hint">من شيت SendFailures</span></div>
+        <div class="list-mini" id="rFails"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -537,6 +639,124 @@ document.getElementById('contentForm').addEventListener('submit',async e=>{
   }finally{ btn.disabled=false; btn.innerHTML='✦ جهّز المحتوى'; }
 });
 
+// ---------- تقرير الأعمال → Vercel → WF16 ----------
+const REPORT_URL = '/api/business-report';
+let REP_DAYS = 30, REP_LOADED = false;
+// أسماء المنتجات والعملاء جاية من الشيت — أي حد بيعدّل الشيت ممكن يحط HTML، فلازم تتنضف
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STATUS_AR = {delivered:'اتسلّم',shipped:'اتشحن',preparing:'بيتجهز',confirmed:'متأكد',new:'جديد',
+  cancelled:'ملغي',returned:'مرتجع',refused:'مرفوض',active:'نشط',open:'مفتوح',needs_human:'محتاج تدخل',
+  COD:'كاش عند الاستلام',card:'كارت'};
+const ar = s => STATUS_AR[s] || s;
+
+function delta(p, invert){
+  if(p===null||p===undefined) return '<div class="delta up">جديد — مفيش فترة قبلها للمقارنة</div>';
+  if(p===0) return '<div class="delta flat">زي الفترة اللي فاتت</div>';
+  const good = invert ? p<0 : p>0;
+  return `<div class="delta ${good?'up':'down'}">${p>0?'▲':'▼'} ${fmt(Math.abs(p))}% عن الفترة اللي فاتت</div>`;
+}
+const kpiCard = (label, value, cls='', extra='') =>
+  `<div class="kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${extra}</div>`;
+const miniList = (el, rows, empty) => {
+  document.getElementById(el).innerHTML = rows.length ? rows.join('') : `<div class="empty" style="padding:18px">${empty}</div>`;
+};
+
+function renderReport(r){
+  document.getElementById('page-report').classList.add('has-data');
+  const P=r.period, S=r.sales, C=r.customers, V=r.service, PR=r.products;
+  document.getElementById('repPeriod').textContent =
+    `من ${P.from} لـ ${P.to} · آخر تحديث ${new Date(r.generated_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}`;
+  const dq=r.data_quality||{};
+  document.getElementById('repNote').textContent = dq.test_customers_excluded
+    ? `تم استبعاد ${fmt(dq.test_customers_excluded)} عميل تجريبي من الأرقام` : '';
+
+  // ---- المبيعات ----
+  document.getElementById('repSales').innerHTML = [
+    kpiCard('المبيعات', egp(S.revenue), 'gold', delta(S.revenue_change_pct)),
+    kpiCard('الأوردرات', fmt(S.orders), '', delta(S.orders_change_pct)),
+    kpiCard('متوسط قيمة الأوردر', egp(S.aov), '', delta(S.aov_change_pct)),
+    kpiCard('ملغي ومرتجع', fmt(S.cancelled), S.cancelled?'ru':'em', `<div class="note">من ${fmt(S.orders)} أوردر</div>`),
+    kpiCard('عملاء بيشتروا تاني', fmt(S.repeat_rate_pct)+'%', 'em', '<div class="note">من كل اللي اشتروا</div>'),
+    kpiCard('أوردرات واقفة', fmt(S.stalled), S.stalled?'ru':'em', '<div class="note">محتاجة متابعة</div>')
+  ].join('');
+  const lbl=a=>a.map(x=>String(x.date).slice(5)), val=a=>a.map(x=>x.value);
+  chart('rChRevenue',{type:'line',data:{labels:lbl(S.revenue_by_day),datasets:[{data:val(S.revenue_by_day),
+    borderColor:CY,backgroundColor:'rgba(56,189,248,.14)',fill:true,tension:.35,pointRadius:0,borderWidth:2}]},
+    options:{...noLegend,scales:gridY}});
+  chart('rChOrders',{type:'bar',data:{labels:lbl(S.orders_by_day),datasets:[{data:val(S.orders_by_day),
+    backgroundColor:EM,borderRadius:5}]},options:{...noLegend,scales:gridY}});
+  const dn=(id,arr)=>chart(id,{type:'doughnut',data:{labels:arr.map(x=>ar(x.name)),
+    datasets:[{data:arr.map(x=>x.value),backgroundColor:PAL,borderWidth:0}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12}}},cutout:'62%'}});
+  dn('rChStatus',S.by_status); dn('rChPay',S.by_payment);
+  miniList('rStalled', (S.stalled_list||[]).map(o=>
+    `<div class="row"><span>${esc(o.customer_name||'—')} · #${esc(String(o.order_id).slice(-6))}</span>`+
+    `<span><span class="pill bad">${fmt(o.days_waiting)} يوم</span> ${egp(o.total)}</span></div>`), 'مفيش أوردرات واقفة 👌');
+
+  // ---- المنتجات ----
+  chart('rChTop',{type:'bar',data:{labels:PR.top.map(x=>x.name),datasets:[{data:PR.top.map(x=>x.revenue),
+    backgroundColor:GOLD,borderRadius:5}]},options:{...noLegend,indexAxis:'y',
+    scales:{x:{grid:{color:'rgba(255,255,255,.05)'}},y:{grid:{display:false}}}}});
+  const tt=document.getElementById('rTopTable');
+  tt.querySelector('thead').innerHTML='<tr><th>المنتج</th><th>القطع</th><th>الإيراد</th></tr>';
+  tt.querySelector('tbody').innerHTML = PR.top.length
+    ? PR.top.map(p=>`<tr><td>${esc(p.name)}</td><td>${fmt(p.qty)}</td><td>${egp(p.revenue)}</td></tr>`).join('')
+    : '<tr><td class="empty" colspan="3">مفيش مبيعات في الفترة دي</td></tr>';
+  miniList('rLowStock', PR.low_stock.map(p=>
+    `<div class="row"><span>${esc(p.product)}</span><span class="pill ${p.stock?'warn':'bad'}">${p.stock?fmt(p.stock)+' قطعة':'خلص'}</span></div>`),
+    'المخزون كويس في كل المنتجات');
+
+  // ---- العملاء ----
+  document.getElementById('repCust').innerHTML = [
+    kpiCard('عملاء جدد', fmt(C.new), 'gold', delta(C.new_change_pct)),
+    kpiCard('عملاء اتكلموا معانا', fmt(C.active), '', '<div class="note">في الفترة دي</div>'),
+    kpiCard('إجمالي العملاء', fmt(C.total), ''),
+    kpiCard('محتاجين تدخلك', fmt(C.needs_human), C.needs_human?'ru':'em'),
+    kpiCard('عملاء نايمين', fmt(C.dormant), C.dormant?'ru':'', '<div class="note">اشتروا ومارجعوش من 60 يوم</div>')
+  ].join('');
+  chart('rChNew',{type:'bar',data:{labels:lbl(C.new_by_day),datasets:[{data:val(C.new_by_day),
+    backgroundColor:SA,borderRadius:5}]},options:{...noLegend,scales:gridY}});
+  dn('rChCust',C.by_status);
+
+  // ---- الخدمة ----
+  document.getElementById('repSvc').innerHTML = [
+    kpiCard('رسايل العملاء', fmt(V.messages), '', delta(V.messages_change_pct)),
+    kpiCard('بعد المواعيد', fmt(V.after_hours_pct)+'%', 'gold', `<div class="note">${fmt(V.after_hours)} رسالة من 10 بالليل لـ 8 الصبح</div>`),
+    kpiCard('متابعات اتبعتت', fmt(V.followups_sent), 'em'),
+    kpiCard('شكاوى مفتوحة', fmt(V.complaints_open), V.complaints_open?'ru':'em', `<div class="note">${fmt(V.complaints_high_open)} خطيرة · ${fmt(V.complaints_new)} جديدة</div>`),
+    kpiCard('رسايل فشلت', fmt(V.send_failures), V.send_failures?'ru':'em')
+  ].join('');
+  chart('rChHours',{type:'bar',data:{labels:V.messages_by_hour.map(x=>x.hour+':00'),
+    datasets:[{data:V.messages_by_hour.map(x=>x.value),
+      backgroundColor:V.messages_by_hour.map(x=>(x.hour>=22||x.hour<8)?CY:'rgba(62,123,250,.55)'),borderRadius:4}]},
+    options:{...noLegend,scales:gridY}});
+  miniList('rFails', V.failures_by_reason.map(f=>
+    `<div class="row"><span>${esc(f.name)}</span><span class="pill bad">${fmt(f.value)}</span></div>`), 'مفيش رسايل فشلت ✓');
+}
+
+async function loadReport(){
+  const err=document.getElementById('repErr'), btn=document.getElementById('repRefresh');
+  err.innerHTML=''; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  document.getElementById('repLoading').style.display='';
+  try{
+    const res=await fetch(`${REPORT_URL}?days=${REP_DAYS}`);
+    if(res.status===401){ location.reload(); return; }
+    if(!res.ok) throw new Error(res.status);
+    renderReport(await res.json()); REP_LOADED=true;
+  }catch(e){
+    // مابنعرضش أرقام تجريبية هنا — تقرير بأرقام وهمية أخطر من تقرير مش ظاهر
+    err.innerHTML='<div class="rep-err">⚠ مقدرناش نجيب التقرير دلوقتي — جرّب تاني بعد شوية</div>';
+    document.getElementById('repLoading').style.display='none';
+  }finally{ btn.innerHTML='⟳'; btn.disabled=false; }
+}
+document.querySelectorAll('#repSeg button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#repSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); REP_DAYS=Number(b.dataset.d); loadReport();
+}));
+document.getElementById('repRefresh').addEventListener('click',loadReport);
+// بيحمّل أول ما التبويب يتفتح بس — WF16 بيقرا 6 شيتات، مش لازم يشتغل مع كل زيارة
+document.querySelector('.tab[data-page="report"]')?.addEventListener('click',()=>{ if(!REP_LOADED) loadReport(); });
+
 // ---------- تكييف الداشبورد على باقة العميل ----------
 (function applyPlan(){
   const has=CLIENT.services;
@@ -544,7 +764,7 @@ document.getElementById('contentForm').addEventListener('submit',async e=>{
 
   if(contentOnly){
     // باقة المحتوى بس: شيل التبويبات اللي مالهاش بيانات بدل ما تبان فاضية
-    ['analytics','data'].forEach(pg=>{
+    ['report','analytics','data'].forEach(pg=>{
       document.querySelector(`.tab[data-page="${pg}"]`)?.remove();
       document.getElementById('page-'+pg)?.remove();
     });
@@ -556,6 +776,8 @@ document.getElementById('contentForm').addEventListener('submit',async e=>{
     const ct=document.querySelector('.tab[data-page="content"]');
     if(ct){ ct.classList.add('active'); document.getElementById('page-content')?.classList.add('active'); }
   } else {
+    // تقرير الأعمال: شيل الأقسام اللي مالهاش خدمة
+    document.querySelectorAll('#page-report .rep-section').forEach(s=>{ if(!has[s.dataset.svc]) s.remove(); });
     if(!has.orders){
       ['chStatus','chPay','chOrders','chTop','chRevenue'].forEach(id=>
         document.getElementById(id)?.closest('.panel')?.remove());
